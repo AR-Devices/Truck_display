@@ -33,7 +33,7 @@ char velocity_status[3] = {'0'};   // 3 digit speed info, from low to high, velo
 int disp_velocity_status = ON;    // should always be on
 int velocity = 0;
 int check_vel_first = 0;
-
+int beep_gap=0;                   // counter of the beeper
 
 void clearBufferAndStatus();         // just clear buffer and status
 void displayProcess();               // display the screen
@@ -46,7 +46,7 @@ void main(void)
   UCSCTL4 = SELA__DCOCLKDIV + SELS__DCOCLKDIV + SELM__DCOCLKDIV;  // set the all the clock(ACLK, MCLK, SMCLK) as DCOCLK  */
 		WDTCTL = WDTPW + WDTHOLD;                 // Stop WDT
 		UCSCTL3 |= SELREF_2; // Set DCO FLL reference = REFO    internal 32768hz crystal
-		UCSCTL4 |= SELA_2; // Set ACLK = REFO, MCLK and SMCLK use default value
+		UCSCTL4 |= SELA_2; // Set ACLK = REFO, MCLK and SMCLK use default value as DCOCLKDIV
 		__bis_SR_register(SCG0);
 		// Disable the FLL control loop
 		UCSCTL0 = 0x0000; // Set lowest possible DCOx, MODx
@@ -55,6 +55,11 @@ void main(void)
 								// (N + 1) * FLLRef = Fdco
 								// (255 + 1) * 32768 = 8MHz
 								// Set FLL Div = fDCOCLK/2
+
+		P4DIR |= BIT4;                            // P1.0 output
+		  TA1CCTL0 = CCIE;                          // CCR0 interrupt enabled
+		  TA1CCR0 = 1000;
+		  TA1CTL = TASSEL_2 | MC_1 | TACLR;         // SMCLK, upmode, clear TAR
 		__bic_SR_register(SCG0);
 		// Enable the FLL control loop
 
@@ -63,7 +68,8 @@ void main(void)
 		// UG for optimization.
 		// 32 x 32 x 8 MHz / 32,768 Hz ~ 262000 = MCLK cycles for DCO to settle
 		__delay_cycles(262000);
-
+		  P1DIR |= BIT2;
+		  P1OUT |= BIT2;				// Feedback to button control chip, prevent reset
 		// Loop until XT1,XT2 & DCO fault flag is cleared
 		do {
 			UCSCTL7 &= ~(XT2OFFG + XT1LFOFFG + DCOFFG);
@@ -250,6 +256,7 @@ void clearBufferAndStatus(){         // sorry for the name, at the end it won't 
 #pragma vector=USCI_A0_VECTOR
 __interrupt void USCI_A0_ISR(void)
 {
+	//TA1CCTL0 &= ~CCIE;                          // CCR0 interrupt disbaled, prevent timer process during uart
                                     // Vector 2 - RXIFG
 	  while (!(UCA0IFG&UCRXIFG));             // USCI_A0 TX buffer ready?
 	  if(!broken_flag){
@@ -267,6 +274,29 @@ __interrupt void USCI_A0_ISR(void)
 		  }
 	  }
 
+
+}
+
+// Timer1 A0 interrupt service routine
+#if defined(__TI_COMPILER_VERSION__) || defined(__IAR_SYSTEMS_ICC__)
+#pragma vector=TIMER1_A0_VECTOR
+__interrupt void TIMER1_A0_ISR(void)
+#elif defined(__GNUC__)
+void __attribute__ ((interrupt(TIMER1_A0_VECTOR))) TIMER1_A0_ISR (void)
+#else
+#error Compiler not supported!
+#endif
+{
+  beep_gap += 1;
+  if(disp_car_status ==2 || disp_people_status==2){
+	  if(beep_gap<500)
+	  	  P4OUT ^= BIT4;                            // Toggle P1.0
+	  else
+	  	  P4OUT = 0;
+	  beep_gap = beep_gap % 1000;
+  }else{
+	  beep_gap = 0;
+  }
 
 }
 

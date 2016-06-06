@@ -29,7 +29,7 @@ void Uart_Init(double BaudRate, char parity, char LMSBMode, int bitMode, int sto
 	//Clk = Uart_setBaudClock(BaudRate);        // set the Uart clock as SMCLK
 	UCAxCTL1 |= UCSSEL__SMCLK;   				//SMCLK，保证速度, 1MHz频率
 	//Uart_setBaudRate(BaudRate, 8000000);          // set the BaudRate
-	UCAxBR0 = 54;                              // 8MHz 9600 (see User's Guide)  其实吧，还是查表快(表上的信息要除4，tmd坑)
+	UCAxBR0 = 54;                              // 8MHz 9600 (see User's Guide)  其实吧，还是查表快
 	UCAxBR1 = 0;                              // 8MHz 9600          total br1*256+br0
 	UCAxMCTL = UCBRS_0 + UCBRF_10 + UCOS16;   // 8MHz 9600  */
 	/* UCAxBR0 = 6;                              // 1MHz 9600 (see User's Guide)  其实吧，还是查表快
